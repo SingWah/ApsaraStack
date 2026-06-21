@@ -1,0 +1,17 @@
+{
+  "name": "apsara-code-analyzer",
+  "displayName": "ApsaraStack 代码分析",
+  "version": "1.0.0",
+  "description": "Analyze ApsaraStack codebase and generate interactive HTML architecture diagrams with call chains, API interfaces, and module dependencies.",
+  "descriptionZh": "分析 ApsaraStack 代码库，生成交互式 HTML 分层架构图，包含函数调用链、API 接口和模块依赖关系。",
+  "category": "engineering",
+  "tags": [
+    "code-analysis",
+    "architecture",
+    "call-graph",
+    "apsarastack"
+  ],
+  "skills": [
+    "./skills/代码调用分析"
+  ]
+}

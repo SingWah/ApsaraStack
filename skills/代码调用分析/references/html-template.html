@@ -156,21 +156,129 @@ body {
   border-top: 1px solid var(--border);
 }
 
-/* Overview call chains */
-.overview-chain {
+/* ===== Call Chain Flow Diagram ===== */
+.flow-diagram {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 16px 20px;
+  padding: 20px;
 }
-.overview-chain .chain-item {
-  padding: 6px 0;
+
+/* 单条调用链：横向 flex 布局，节点 + SVG 箭头交替排列 */
+.flow-chain {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 0;
+  padding: 16px 8px;
   border-bottom: 1px solid var(--border);
-  font-family: var(--mono);
-  font-size: 13px;
+  overflow-x: auto;
 }
-.overview-chain .chain-item:last-child { border-bottom: none; }
-.overview-chain .arrow { color: var(--arrow-hl); margin: 0 4px; }
+.flow-chain:last-of-type { border-bottom: none; }
+
+/* 链序号标签 */
+.flow-chain-label {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--border);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+/* 调用节点：彩色边框 + 暗色背景的圆角矩形 */
+.flow-node {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--mono);
+  background: var(--card-header-bg);
+  border: 2px solid var(--border);
+  text-align: center;
+  line-height: 1.3;
+  white-space: nowrap;
+  position: relative;
+  transition: opacity 0.15s;
+}
+.flow-node:hover { opacity: 0.85; }
+
+/* 节点内模块名（粗体大字） */
+.flow-node .fn-name {
+  font-weight: 600;
+  display: block;
+  color: #fff;
+}
+/* 节点内函数/方法名（小字） */
+.flow-node .fn-method {
+  font-size: 11px;
+  color: var(--text-light);
+  display: block;
+}
+
+/* 节点颜色按层级着色 */
+.flow-node.layer-entry      { border-color: var(--layer-entry); }
+.flow-node.layer-entry .fn-name      { color: var(--layer-entry); }
+.flow-node.layer-api        { border-color: var(--layer-api); }
+.flow-node.layer-api .fn-name        { color: var(--layer-api); }
+.flow-node.layer-controller { border-color: var(--layer-controller); }
+.flow-node.layer-controller .fn-name { color: var(--layer-controller); }
+.flow-node.layer-service    { border-color: var(--layer-service); }
+.flow-node.layer-service .fn-name    { color: var(--layer-service); }
+.flow-node.layer-data       { border-color: var(--layer-data); }
+.flow-node.layer-data .fn-name       { color: var(--layer-data); }
+.flow-node.layer-model      { border-color: var(--layer-model); }
+.flow-node.layer-model .fn-name      { color: var(--layer-model); }
+.flow-node.layer-infra      { border-color: var(--layer-infra); }
+.flow-node.layer-infra .fn-name      { color: var(--layer-infra); }
+
+/* SVG 箭头连接线（节点之间） */
+.flow-arrow {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin: 0 2px;
+}
+.flow-arrow svg {
+  display: block;
+}
+
+/* 调用链描述文字 */
+.flow-desc {
+  font-size: 12px;
+  color: var(--text-light);
+  padding: 4px 8px 12px 42px; /* 与链序号对齐 */
+  line-height: 1.5;
+}
+
+/* 迷你图例（调用链区域底部） */
+.flow-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  font-size: 11px;
+  color: var(--text-light);
+}
+.flow-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.flow-legend-item .fl-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 2px solid;
+}
 
 /* Inheritance list */
 .inherit-list {
@@ -550,17 +658,139 @@ body {
     </table>
   </div>
 
-  <!-- 关键调用链 -->
+  <!-- 关键调用链（可视化流程图） -->
+  <!--
+    生成说明：
+    1. 每条调用链用 .flow-chain 行表示，内部为 flow-node + flow-arrow 交替排列
+    2. 每个 flow-node 根据模块所属架构层添加 layer-{key} class 进行颜色区分
+    3. flow-node 内包含 .fn-name（模块名）和可选的 .fn-method（函数名）
+    4. flow-arrow 内使用 SVG 绘制带箭头的连接线
+    5. 每条链下方用 .flow-desc 写描述文字
+    6. 底部 .flow-legend 展示层级颜色对照
+
+    SVG 箭头使用以下固定模板（直接复制即可）:
+    <div class="flow-arrow">
+      <svg width="44" height="16" viewBox="0 0 44 16">
+        <defs>
+          <marker id="ah" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto">
+            <polygon points="0 0, 7 2.5, 0 5" fill="#565f89"/>
+          </marker>
+        </defs>
+        <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+      </svg>
+    </div>
+
+    注意：第一个 flow-chain 的 SVG 中定义 <defs><marker>，
+    后续 flow-arrow 可省略 <defs>，仅保留 <line> + marker-end="url(#ah)"。
+  -->
   <div class="overview-section">
     <h3>关键调用链</h3>
-    <div class="overview-chain">
-      <!-- 每条调用链 -->
-      <div class="chain-item">
-        main<span class="arrow">→</span>api_server.start<span class="arrow">→</span>handle_create<span class="arrow">→</span>api_impl.create_instance<span class="arrow">→</span>db.insert<span class="arrow">→</span>state_machine.transition
+    <div class="flow-diagram">
+
+      <!-- 调用链 1：创建实例完整链路 -->
+      <div class="flow-chain">
+        <div class="flow-chain-label">1</div>
+        <div class="flow-node layer-entry">
+          <span class="fn-name">main</span>
+          <span class="fn-method">启动入口</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <defs><marker id="ah" markerWidth="7" markerHeight="5" refX="6" refY="2.5" orient="auto"><polygon points="0 0, 7 2.5, 0 5" fill="#565f89"/></marker></defs>
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-api">
+          <span class="fn-name">api_server</span>
+          <span class="fn-method">.start()</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-controller">
+          <span class="fn-name">handle_create</span>
+          <span class="fn-method">路由分发</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-service">
+          <span class="fn-name">api_impl</span>
+          <span class="fn-method">.create_instance()</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-data">
+          <span class="fn-name">db</span>
+          <span class="fn-method">.insert()</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-service">
+          <span class="fn-name">state_machine</span>
+          <span class="fn-method">.transition()</span>
+        </div>
       </div>
-      <div class="chain-item">
-        state_machine.poll_status<span class="arrow">→</span>db.query_instances<span class="arrow">→</span>agent.execute_task<span class="arrow">→</span>agent.report_result
+      <div class="flow-desc">创建实例完整链路：启动服务 → 接收请求 → 参数校验 → 写入数据库 → 驱动状态机</div>
+
+      <!-- 调用链 2：状态轮询链路 -->
+      <div class="flow-chain">
+        <div class="flow-chain-label">2</div>
+        <div class="flow-node layer-service">
+          <span class="fn-name">state_machine</span>
+          <span class="fn-method">.poll_status()</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-data">
+          <span class="fn-name">db</span>
+          <span class="fn-method">.query_instances()</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-service">
+          <span class="fn-name">agent</span>
+          <span class="fn-method">.execute_task()</span>
+        </div>
+        <div class="flow-arrow">
+          <svg width="44" height="16" viewBox="0 0 44 16">
+            <line x1="0" y1="8" x2="36" y2="8" stroke="#565f89" stroke-width="2" marker-end="url(#ah)"/>
+          </svg>
+        </div>
+        <div class="flow-node layer-infra">
+          <span class="fn-name">agent</span>
+          <span class="fn-method">.report_result()</span>
+        </div>
       </div>
+      <div class="flow-desc">状态轮询链路：查询待执行实例 → 分发任务到节点 → Agent 执行 → 回报结果</div>
+
+      <!-- 层级颜色图例（仅输出实际使用的层级） -->
+      <div class="flow-legend">
+        <div class="flow-legend-item"><div class="fl-dot" style="border-color:var(--layer-entry)"></div> 入口层</div>
+        <div class="flow-legend-item"><div class="fl-dot" style="border-color:var(--layer-api)"></div> 接口层</div>
+        <div class="flow-legend-item"><div class="fl-dot" style="border-color:var(--layer-controller)"></div> 控制层</div>
+        <div class="flow-legend-item"><div class="fl-dot" style="border-color:var(--layer-service)"></div> 服务层</div>
+        <div class="flow-legend-item"><div class="fl-dot" style="border-color:var(--layer-data)"></div> 数据层</div>
+        <div class="flow-legend-item"><div class="fl-dot" style="border-color:var(--layer-model)"></div> 模型层</div>
+        <div class="flow-legend-item"><div class="fl-dot" style="border-color:var(--layer-infra)"></div> 基础设施层</div>
+      </div>
+
     </div>
   </div>
 
@@ -585,7 +815,7 @@ body {
       <div class="dep-card">
         <h3>外部服务</h3>
         <ul>
-          <li>天基 Master API</li>
+          <li>天机 Master API</li>
           <li>DNS API</li>
         </ul>
       </div>
@@ -716,7 +946,7 @@ body {
         </div>
         <div class="call-section">
           <h4>外部服务调用</h4>
-          <div class="call-item">transition <span class="arrow">→</span> HTTP: 天基 Master API</div>
+          <div class="call-item">transition <span class="arrow">→</span> HTTP: 天机 Master API</div>
         </div>
         <div class="err-section">
           <h4>常见异常与陷阱</h4>
@@ -843,7 +1073,7 @@ body {
     <div class="dep-card">
       <h3>外部服务</h3>
       <ul>
-        <li>天基 Master (127.0.0.1:7070)</li>
+        <li>天机 Master (127.0.0.1:7070)</li>
         <li>DNS API</li>
         <li>K8s API Server</li>
       </ul>
