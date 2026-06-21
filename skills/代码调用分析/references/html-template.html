@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{PROJECT_NAME}} - 架构分析</title>
+<style>
+:root {
+  --bg: #1a1b26;
+  --text: #c0caf5;
+  --text-light: #565f89;
+  --border: #3b4261;
+  --card-bg: #24283b;
+  --card-header-bg: #1f2335;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3);
+
+  --layer-entry: #7aa2f7;
+  --layer-api: #2ac3de;
+  --layer-controller: #9ece6a;
+  --layer-service: #ff9e64;
+  --layer-data: #bb9af7;
+  --layer-model: #7dcfff;
+  --layer-infra: #a9b1d6;
+
+  --func-hl: #f7768e;
+  --arrow-hl: #2ac3de;
+
+  --mono: 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* ===== Header ===== */
+.header { margin-bottom: 32px; }
+.header h1 { font-size: 28px; font-weight: 700; margin-bottom: 4px; color: #fff; }
+.header .subtitle { color: var(--text-light); font-size: 14px; }
+.header .lang-badge {
+  display: inline-block;
+  background: var(--layer-api);
+  color: var(--bg);
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 10px;
+  margin-left: 8px;
+  vertical-align: middle;
+  font-weight: 600;
+}
+
+/* ===== Stats ===== */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+.stat-card .stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #fff;
+}
+.stat-card .stat-label {
+  font-size: 13px;
+  color: var(--text-light);
+  margin-top: 2px;
+}
+
+/* ===== Tab Navigation ===== */
+.tab-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 0;
+}
+.tab-btn {
+  padding: 10px 20px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-light);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.2s, border-color 0.2s;
+  font-family: var(--sans);
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: #fff; }
+
+/* Tab button active border colors per layer */
+.tab-btn[data-tab="overview"].active { border-bottom-color: var(--layer-api); }
+.tab-btn[data-tab="entry"].active { border-bottom-color: var(--layer-entry); }
+.tab-btn[data-tab="api"].active { border-bottom-color: var(--layer-api); }
+.tab-btn[data-tab="controller"].active { border-bottom-color: var(--layer-controller); }
+.tab-btn[data-tab="service"].active { border-bottom-color: var(--layer-service); }
+.tab-btn[data-tab="data"].active { border-bottom-color: var(--layer-data); }
+.tab-btn[data-tab="model"].active { border-bottom-color: var(--layer-model); }
+.tab-btn[data-tab="infra"].active { border-bottom-color: var(--layer-infra); }
+
+/* ===== Tab Panels ===== */
+.tab-panel { display: none; padding: 24px 0; }
+.tab-panel.active { display: block; }
+
+/* ===== Overview Tab ===== */
+.overview-section {
+  margin-bottom: 28px;
+}
+.overview-section h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 12px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Overview tables */
+.overview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.overview-table th {
+  background: var(--card-header-bg);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-light);
+}
+.overview-table td {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* Overview call chains */
+.overview-chain {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.overview-chain .chain-item {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.overview-chain .chain-item:last-child { border-bottom: none; }
+.overview-chain .arrow { color: var(--arrow-hl); margin: 0 4px; }
+
+/* Inheritance list */
+.inherit-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px;
+}
+.inherit-item {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.inherit-item .parent { color: var(--layer-service); }
+
+/* ===== Module Grid ===== */
+.mod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 16px;
+}
+
+/* ===== Module Card ===== */
+.mod-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mod-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--card-header-bg);
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+.mod-hdr h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+}
+.mod-hdr .mod-file {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-light);
+  margin-left: 8px;
+}
+.mod-hdr::after {
+  content: '▸';
+  font-size: 12px;
+  color: var(--text-light);
+  transition: transform 0.2s;
+}
+.mod-card.expanded .mod-hdr::after { transform: rotate(90deg); }
+
+.mod-body {
+  display: none;
+  padding: 16px;
+}
+.mod-card.expanded .mod-body { display: block; }
+
+/* ===== Implementation Principle ===== */
+.impl-desc {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: var(--card-header-bg);
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+  border-left: 3px solid var(--layer-api);
+}
+
+/* ===== Function List ===== */
+.func-list { list-style: none; margin-bottom: 12px; }
+.func-list li {
+  padding: 4px 0;
+  font-family: var(--mono);
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.func-list li:last-child { border-bottom: none; }
+.func-name { color: var(--func-hl); font-weight: 600; }
+.func-args { color: var(--text-light); }
+
+/* ===== Call Relations ===== */
+.call-section {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.call-section h4 {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.call-item {
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 2px 0;
+  color: var(--text);
+}
+.call-item .arrow { color: var(--arrow-hl); margin: 0 4px; }
+
+/* ===== Inheritance Badge ===== */
+.inherit-badge {
+  display: inline-block;
+  background: rgba(255,158,100,0.15);
+  border: 1px solid var(--layer-service);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--layer-service);
+}
+
+/* ===== Error / Pitfall Table ===== */
+.err-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.err-section h4 {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+.err-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.err-table th {
+  background: var(--card-header-bg);
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--text-light);
+  font-size: 11px;
+}
+.err-table td {
+  padding: 6px 10px;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+}
+.err-table tr:nth-child(even) td { background: rgba(31,35,53,0.5); }
+.err-table .err-impact { color: var(--layer-service); }
+.err-table .err-fix { color: var(--layer-controller); }
+
+/* ===== Section (below tabs) ===== */
+.section {
+  margin-top: 40px;
+}
+.section h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--layer-api);
+  color: #fff;
+}
+
+/* ===== API Table ===== */
+.api-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.api-table th {
+  background: var(--card-header-bg);
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-light);
+}
+.api-table td {
+  padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+.api-table .method {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: var(--bg);
+}
+.method-get { background: var(--layer-controller); }
+.method-post { background: var(--layer-api); }
+.method-put { background: var(--layer-service); }
+.method-delete { background: var(--func-hl); }
+.method-patch { background: var(--layer-data); }
+.api-table .path {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.api-table .handler {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--layer-service);
+}
+
+/* ===== Dependencies ===== */
+.dep-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+.dep-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.dep-card h3 {
+  font-size: 14px;
+  margin-bottom: 8px;
+  color: var(--layer-api);
+}
+.dep-card ul {
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.dep-card ul li {
+  padding: 3px 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+.dep-card ul li:last-child { border-bottom: none; }
+
+/* ===== Legend ===== */
+.legend {
+  margin-top: 40px;
+  padding: 16px 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-light);
+}
+.legend-colors {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+}
+.legend-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-color .dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+}
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<div class="header">
+  <h1>{{PROJECT_NAME}} <span class="lang-badge">{{LANG}}</span></h1>
+  <p class="subtitle">代码架构分析 · 生成于 {{DATE}} · 共 {{FILE_COUNT}} 个源文件</p>
+</div>
+
+<!-- ===== STATISTICS ===== -->
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-num">{{FILE_COUNT}}</div>
+    <div class="stat-label">源文件</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{FUNC_COUNT}}</div>
+    <div class="stat-label">函数/方法</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{CLASS_COUNT}}</div>
+    <div class="stat-label">类/结构体</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{API_COUNT}}</div>
+    <div class="stat-label">API 接口</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{DEP_COUNT}}</div>
+    <div class="stat-label">外部依赖</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-num">{{LAYER_COUNT}}</div>
+    <div class="stat-label">架构层数</div>
+  </div>
+</div>
+
+<!-- ===== TAB NAVIGATION ===== -->
+<!--
+  Tab 按钮说明:
+  - data-tab 属性对应 tab-panel 的 id（tab-{key}）
+  - 第一个 Tab 固定为 "架构总览"（data-tab="overview"）
+  - 后续 Tab 为各架构层，仅输出有模块的层
+  - data-tab 取值: overview, entry, api, controller, service, data, model, infra
+  - active class 标记当前选中 Tab
+-->
+<div class="tab-nav">
+  <button class="tab-btn active" data-tab="overview" onclick="switchTab(this)">架构总览</button>
+  <button class="tab-btn" data-tab="entry" onclick="switchTab(this)">入口层</button>
+  <button class="tab-btn" data-tab="service" onclick="switchTab(this)">服务层</button>
+  <button class="tab-btn" data-tab="controller" onclick="switchTab(this)">控制层</button>
+  <button class="tab-btn" data-tab="data" onclick="switchTab(this)">数据层</button>
+  <button class="tab-btn" data-tab="model" onclick="switchTab(this)">模型层</button>
+  <button class="tab-btn" data-tab="infra" onclick="switchTab(this)">基础设施层</button>
+  <!-- 只输出有模块的 Tab，如果某层没有模块则不生成对应 button -->
+</div>
+
+<!-- ===== TAB: 架构总览 ===== -->
+<!--
+  此 Tab 始终存在，展示全局概览信息：
+  1. 子模块对照表
+  2. 关键调用链汇总
+  3. 外部依赖分类（简要版）
+  4. 类继承关系
+-->
+<div class="tab-panel active" id="tab-overview">
+
+  <!-- 子模块对照表 -->
+  <div class="overview-section">
+    <h3>子模块对照表</h3>
+    <table class="overview-table">
+      <thead>
+        <tr>
+          <th>子模块</th>
+          <th>所属层</th>
+          <th>文件数</th>
+          <th>核心职责</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- 示例行，生成时替换为实际数据 -->
+        <tr>
+          <td>main</td>
+          <td>入口层</td>
+          <td>1</td>
+          <td>程序启动入口，解析命令行参数并启动服务</td>
+        </tr>
+        <tr>
+          <td>api_server</td>
+          <td>接口层</td>
+          <td>3</td>
+          <td>HTTP API 路由定义与请求分发</td>
+        </tr>
+        <tr>
+          <td>state_machine</td>
+          <td>服务层</td>
+          <td>2</td>
+          <td>核心状态机引擎，驱动实例生命周期流转</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 关键调用链 -->
+  <div class="overview-section">
+    <h3>关键调用链</h3>
+    <div class="overview-chain">
+      <!-- 每条调用链 -->
+      <div class="chain-item">
+        main<span class="arrow">→</span>api_server.start<span class="arrow">→</span>handle_create<span class="arrow">→</span>api_impl.create_instance<span class="arrow">→</span>db.insert<span class="arrow">→</span>state_machine.transition
+      </div>
+      <div class="chain-item">
+        state_machine.poll_status<span class="arrow">→</span>db.query_instances<span class="arrow">→</span>agent.execute_task<span class="arrow">→</span>agent.report_result
+      </div>
+    </div>
+  </div>
+
+  <!-- 外部依赖分类（简要） -->
+  <div class="overview-section">
+    <h3>外部依赖分类</h3>
+    <div class="dep-grid">
+      <div class="dep-card">
+        <h3>第三方库</h3>
+        <ul>
+          <li>requests 2.28.0</li>
+          <li>sqlalchemy 1.4.0</li>
+        </ul>
+      </div>
+      <div class="dep-card">
+        <h3>数据库</h3>
+        <ul>
+          <li>MySQL (xdb_meta)</li>
+          <li>Redis (cache)</li>
+        </ul>
+      </div>
+      <div class="dep-card">
+        <h3>外部服务</h3>
+        <ul>
+          <li>天基 Master API</li>
+          <li>DNS API</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- 类继承关系 -->
+  <div class="overview-section">
+    <h3>类继承关系</h3>
+    <div class="inherit-list">
+      <!-- 示例 -->
+      <div class="inherit-item">
+        StateMachine <span class="parent">extends BaseEngine</span>
+      </div>
+      <div class="inherit-item">
+        MysqlDao <span class="parent">extends BaseDao</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TAB: 入口层（示例） ===== -->
+<!--
+  每个架构层 Tab 结构相同:
+  <div class="tab-panel" id="tab-{LAYER_KEY}">
+    <div class="mod-grid">
+      ... 模块卡片 ...
+    </div>
+  </div>
+
+  LAYER_KEY: entry, api, controller, service, data, model, infra
+  如果某层没有模块，整个 tab-panel 和对应的 tab-btn 都不输出。
+-->
+<div class="tab-panel" id="tab-entry">
+  <div class="mod-grid">
+
+    <!-- ===== MODULE CARD ===== -->
+    <!--
+      每张模块卡片结构:
+      mod-card > mod-hdr (标题, 点击展开) + mod-body (详情)
+      mod-body 包含:
+        1. impl-desc   — 实现原理段落
+        2. func-list   — 关键函数列表
+        3. call-section — 调用关系
+        4. err-section  — 常见异常与陷阱表格
+    -->
+    <div class="mod-card">
+      <div class="mod-hdr" onclick="this.parentElement.classList.toggle('expanded')">
+        <h3>main <span class="mod-file">main.py</span></h3>
+      </div>
+      <div class="mod-body">
+        <!-- 实现原理 -->
+        <div class="impl-desc">
+          程序启动入口。解析命令行参数（argparse），加载配置文件后初始化日志和数据库连接，最终启动 HTTP 服务监听。采用单进程模型，通过 signal 模块注册优雅退出处理器。
+        </div>
+        <!-- 关键函数列表 -->
+        <ul class="func-list">
+          <li>
+            <span class="func-name">main</span><span class="func-args">(argc, argv)</span>
+          </li>
+          <li>
+            <span class="func-name">parse_args</span><span class="func-args">()</span>
+          </li>
+          <li>
+            <span class="func-name">setup_logging</span><span class="func-args">(level, log_file)</span>
+          </li>
+        </ul>
+        <!-- 调用关系 -->
+        <div class="call-section">
+          <h4>调用 →</h4>
+          <div class="call-item">main <span class="arrow">→</span> api_server.start</div>
+          <div class="call-item">main <span class="arrow">→</span> config.load</div>
+        </div>
+        <div class="call-section">
+          <h4>被调用 ←</h4>
+          <div class="call-item">（程序入口）</div>
+        </div>
+        <!-- 常见异常与陷阱 -->
+        <div class="err-section">
+          <h4>常见异常与陷阱</h4>
+          <table class="err-table">
+            <thead><tr><th>问题</th><th>影响</th><th>建议</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>信号处理中直接 sys.exit</td>
+                <td class="err-impact">子进程可能成为孤儿进程</td>
+                <td class="err-fix">先发送 SIGTERM 给子进程组再退出</td>
+              </tr>
+              <tr>
+                <td>配置文件路径硬编码</td>
+                <td class="err-impact">部署环境变更时需改代码</td>
+                <td class="err-fix">使用环境变量或命令行参数指定路径</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== TAB: 服务层（示例，展示类继承和外部调用） ===== -->
+<div class="tab-panel" id="tab-service">
+  <div class="mod-grid">
+
+    <div class="mod-card">
+      <div class="mod-hdr" onclick="this.parentElement.classList.toggle('expanded')">
+        <h3>state_machine <span class="mod-file">service/state_machine.py</span></h3>
+      </div>
+      <div class="mod-body">
+        <div class="impl-desc">
+          核心状态机引擎，继承 BaseEngine。使用 PriorityQueue 按优先级调度任务，4 个工作线程并行消费。每个任务设置 Timer 超时（默认 300s），超时后自动标记失败并触发重试。状态转换通过预定义的状态转移表驱动，支持回调钩子。
+        </div>
+        <ul class="func-list">
+          <li>
+            <span class="func-name">StateMachine</span>
+            <span class="inherit-badge">extends BaseEngine</span>
+          </li>
+          <li><span class="func-name">transition</span><span class="func-args">(state, event)</span></li>
+          <li><span class="func-name">poll_status</span><span class="func-args">()</span></li>
+          <li><span class="func-name">_worker_loop</span><span class="func-args">(queue)</span></li>
+        </ul>
+        <div class="call-section">
+          <h4>调用 →</h4>
+          <div class="call-item">transition <span class="arrow">→</span> db.update_state</div>
+          <div class="call-item">poll_status <span class="arrow">→</span> db.query_instances</div>
+        </div>
+        <div class="call-section">
+          <h4>外部服务调用</h4>
+          <div class="call-item">transition <span class="arrow">→</span> HTTP: 天基 Master API</div>
+        </div>
+        <div class="err-section">
+          <h4>常见异常与陷阱</h4>
+          <table class="err-table">
+            <thead><tr><th>问题</th><th>影响</th><th>建议</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Timer 超时后未清理线程资源</td>
+                <td class="err-impact">长时间运行后线程泄漏</td>
+                <td class="err-fix">在 Timer callback 中显式 join 并释放</td>
+              </tr>
+              <tr>
+                <td>PriorityQueue 无界增长</td>
+                <td class="err-impact">突发流量时内存 OOM</td>
+                <td class="err-fix">设置 maxsize 并在满时丢弃低优先级任务</td>
+              </tr>
+              <tr>
+                <td>HTTP 调用无重试机制</td>
+                <td class="err-impact">网络抖动导致状态不一致</td>
+                <td class="err-fix">增加指数退避重试（最多 3 次）</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!--
+  继续添加其他层 Tab:
+  tab-api / tab-controller / tab-data / tab-model / tab-infra
+
+  结构完全相同:
+  <div class="tab-panel" id="tab-{LAYER_KEY}">
+    <div class="mod-grid">
+      <div class="mod-card">
+        <div class="mod-hdr" onclick="...">...</div>
+        <div class="mod-body">
+          <div class="impl-desc">...</div>
+          <ul class="func-list">...</ul>
+          <div class="call-section">...</div>
+          <div class="err-section">
+            <h4>常见异常与陷阱</h4>
+            <table class="err-table">...</table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+-->
+
+
+<!-- ===== API INTERFACES ===== -->
+<div class="section">
+  <h2>API 接口</h2>
+  <table class="api-table">
+    <thead>
+      <tr>
+        <th>方法</th>
+        <th>路径</th>
+        <th>处理函数</th>
+        <th>所在文件</th>
+        <th>描述</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- 每个 API 一行 -->
+      <tr>
+        <td><span class="method method-post">POST</span></td>
+        <td class="path">/api/v1/instances</td>
+        <td class="handler">api_server.handle_create</td>
+        <td>api/api_server.py</td>
+        <td>创建实例</td>
+      </tr>
+      <tr>
+        <td><span class="method method-delete">DELETE</span></td>
+        <td class="path">/api/v1/instances/{id}</td>
+        <td class="handler">api_server.handle_delete</td>
+        <td>api/api_server.py</td>
+        <td>删除实例</td>
+      </tr>
+      <tr>
+        <td><span class="method method-get">GET</span></td>
+        <td class="path">/api/v1/instances/{id}/status</td>
+        <td class="handler">api_server.handle_status</td>
+        <td>api/api_server.py</td>
+        <td>查询实例状态</td>
+      </tr>
+      <!--
+        HTTP 方法对应的 CSS class:
+        GET    → method-get
+        POST   → method-post
+        PUT    → method-put
+        DELETE → method-delete
+        PATCH  → method-patch
+      -->
+    </tbody>
+  </table>
+</div>
+
+
+<!-- ===== EXTERNAL DEPENDENCIES ===== -->
+<div class="section">
+  <h2>外部依赖</h2>
+  <div class="dep-grid">
+    <!-- 按依赖类型分卡片 -->
+    <div class="dep-card">
+      <h3>第三方库</h3>
+      <ul>
+        <li>requests 2.28.0</li>
+        <li>sqlalchemy 1.4.0</li>
+        <li>flask 2.3.0</li>
+      </ul>
+    </div>
+    <div class="dep-card">
+      <h3>数据库</h3>
+      <ul>
+        <li>MySQL (xdb_meta)</li>
+        <li>Redis (cache)</li>
+      </ul>
+    </div>
+    <div class="dep-card">
+      <h3>外部服务</h3>
+      <ul>
+        <li>天基 Master (127.0.0.1:7070)</li>
+        <li>DNS API</li>
+        <li>K8s API Server</li>
+      </ul>
+    </div>
+    <div class="dep-card">
+      <h3>中间件</h3>
+      <ul>
+        <li>ZooKeeper</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ===== LEGEND ===== -->
+<div class="legend">
+  <strong>架构层级说明</strong>
+  <div class="legend-colors">
+    <div class="legend-color"><div class="dot" style="background:var(--layer-entry)"></div> 入口层</div>
+    <div class="legend-color"><div class="dot" style="background:var(--layer-api)"></div> 接口层</div>
+    <div class="legend-color"><div class="dot" style="background:var(--layer-controller)"></div> 控制层</div>
+    <div class="legend-color"><div class="dot" style="background:var(--layer-service)"></div> 服务层</div>
+    <div class="legend-color"><div class="dot" style="background:var(--layer-data)"></div> 数据层</div>
+    <div class="legend-color"><div class="dot" style="background:var(--layer-model)"></div> 模型层</div>
+    <div class="legend-color"><div class="dot" style="background:var(--layer-infra)"></div> 基础设施层</div>
+  </div>
+</div>
+
+<!-- ===== JAVASCRIPT ===== -->
+<script>
+// Tab 切换
+function switchTab(btn) {
+  // 移除所有 active
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  // 激活当前
+  btn.classList.add('active');
+  var panel = document.getElementById('tab-' + btn.getAttribute('data-tab'));
+  if (panel) panel.classList.add('active');
+}
+</script>
+
+</body>
+</html>
